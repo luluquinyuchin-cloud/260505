@@ -1,6 +1,9 @@
 let capture;
 let faceMesh;
 let predictions = [];
+let currentMode = 0;
+
+let heartAnim = 0, tearAnim = 0, cyberAnim = 0;
 
 // 嘴唇外圈
 const pointsToConnect1 = [409, 270, 269, 267, 0, 37, 39, 40, 185, 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
@@ -24,6 +27,9 @@ const faceContour = [
   172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10
 ];
 
+const noseTip = 1;
+const leftCheek = 234, rightCheek = 454;
+
 function setup() {
   createCanvas(windowWidth, windowHeight);
   capture = createCapture(VIDEO);
@@ -34,16 +40,62 @@ function setup() {
     console.log("Model Ready!");
     faceMesh.detectStart(capture, results => { predictions = results; });
   });
+
+  // 建立五個特效切換按鈕
+  const modes = [
+    { label: '😳 原版', id: 0 },
+    { label: '😍 愛心眼', id: 1 },
+    { label: '🥹 感動淚', id: 2 },
+    { label: '🤡 小丑', id: 3 },
+    { label: '✨ 無', id: 4 },
+  ];
+
+  let bar = createDiv('');
+  bar.style('position', 'fixed');
+  bar.style('bottom', '0');
+  bar.style('left', '0');
+  bar.style('right', '0');
+  bar.style('display', 'flex');
+  bar.style('justify-content', 'center');
+  bar.style('gap', '14px');
+  bar.style('padding', '14px 20px');
+  bar.style('background', 'rgba(20,20,40,0.85)');
+  bar.style('z-index', '999');
+
+  modes.forEach(m => {
+    let btn = createButton(m.label);
+    btn.parent(bar);
+    btn.style('background', m.id === 0 ? 'rgba(255,100,200,0.35)' : 'rgba(255,255,255,0.08)');
+    btn.style('border', m.id === 0 ? '1.5px solid #ff64c8' : '1.5px solid rgba(255,255,255,0.2)');
+    btn.style('color', '#fff');
+    btn.style('border-radius', '50px');
+    btn.style('padding', '10px 22px');
+    btn.style('font-size', '15px');
+    btn.style('cursor', 'pointer');
+    btn.id('btn-' + m.id);
+    btn.mousePressed(() => {
+      currentMode = m.id;
+      // 更新所有按鈕樣式
+      modes.forEach(mm => {
+        let b = select('#btn-' + mm.id);
+        if (mm.id === currentMode) {
+          b.style('background', 'rgba(255,100,200,0.35)');
+          b.style('border', '1.5px solid #ff64c8');
+        } else {
+          b.style('background', 'rgba(255,255,255,0.08)');
+          b.style('border', '1.5px solid rgba(255,255,255,0.2)');
+        }
+      });
+    });
+  });
 }
 
 function draw() {
-  background('#e7c6ff');
+  background('#0d0d1a');
 
-  // 文字
-  fill(0);
-  textSize(32);
-  textAlign(CENTER, CENTER);
-  text("教科123456789", width / 2, height * 0.15);
+  heartAnim += 0.08;
+  tearAnim += 0.04;
+  cyberAnim += 0.03;
 
   // 計算影像縮放
   let vW = 0, vH = 0;
@@ -51,8 +103,8 @@ function draw() {
 
   if (capture.width > 0 && capture.height > 0) {
     let videoAspect = capture.width / capture.height;
-    let targetW = width * 0.5;
-    let targetH = height * 0.5;
+    let targetW = width * 0.52;
+    let targetH = height * 0.72;
 
     if (videoAspect > targetW / targetH) {
       vW = targetW;
@@ -63,22 +115,28 @@ function draw() {
     }
 
     vx = (width - vW) / 2;
-    vy = (height - vH) / 2;
+    vy = (height - vH) / 2 - 10;
   }
 
   imageMode(CORNER);
   if (vW > 0) image(capture, vx, vy, vW, vH);
 
+  // 標題文字
+  fill(255);
+  noStroke();
+  textSize(28);
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  text('414730571 黃榆秦', width / 2, 38);
+
   if (predictions.length > 0) {
     let keypoints = predictions[0].keypoints;
 
-    // 輔助：將關鍵點轉換為畫布座標
     const toCanvas = (p) => ({
       x: map(p.x, 0, capture.width, vx, vx + vW),
       y: map(p.y, 0, capture.height, vy, vy + vH)
     });
 
-    // 輔助：畫線段串接
     const drawLines = (points, col, weight) => {
       stroke(col);
       strokeWeight(weight);
@@ -90,48 +148,167 @@ function draw() {
       }
     };
 
-    // ── 臉部輪廓外側填充 fdf0d5 ──────────────────────────────
-    // 先將整個畫布蓋上 fdf0d5，再以臉部輪廓剪裁還原影像
-    // 做法：在臉部輪廓路徑上建立遮罩，把輪廓以外填滿 fdf0d5
+    // 輔助：繪製臉部輪廓填充（evenodd 挖洞）
+    const drawFaceFill = (fillColor) => {
+      let contourPts = faceContour.map(idx => toCanvas(keypoints[idx]));
+      drawingContext.save();
+      drawingContext.beginPath();
+      drawingContext.rect(0, 0, width, height);
+      drawingContext.moveTo(contourPts[0].x, contourPts[0].y);
+      for (let i = 1; i < contourPts.length; i++) {
+        drawingContext.lineTo(contourPts[i].x, contourPts[i].y);
+      }
+      drawingContext.closePath();
+      drawingContext.fillStyle = fillColor;
+      drawingContext.fill('evenodd');
+      drawingContext.restore();
+    };
 
-    // 收集臉部輪廓點
-    let contourPts = faceContour.map(idx => toCanvas(keypoints[idx]));
-
-    // 使用 drawingContext 做路徑裁切 (canvas 2D API)
-    drawingContext.save();
-
-    // 建立「全畫布 - 臉部輪廓」的複合路徑（evenodd 填充）
-    drawingContext.beginPath();
-    // 外層大矩形（整個畫布）
-    drawingContext.rect(0, 0, width, height);
-    // 臉部輪廓（逆時針，讓 evenodd 做「挖洞」）
-    drawingContext.moveTo(contourPts[0].x, contourPts[0].y);
-    for (let i = 1; i < contourPts.length; i++) {
-      drawingContext.lineTo(contourPts[i].x, contourPts[i].y);
+    // ──────────────────────────────────────────────
+    // Mode 0: 😳 原版
+    // ──────────────────────────────────────────────
+    if (currentMode === 0) {
+      drawFaceFill('#fdf0d5');
+      drawLines(faceContour, color(0, 200, 255), 2);
+      drawLines(pointsToConnect1, color(255, 0, 0), 1);
+      drawLines(pointsToConnect2, color(255, 0, 0), 1);
+      drawLines(rightEyeOuter, color(40, 40, 40), 15);
+      drawLines(rightEyeInner, color(255, 0, 0), 1);
+      drawLines(leftEyeOuter, color(40, 40, 40), 15);
+      drawLines(leftEyeInner, color(255, 0, 0), 1);
     }
-    drawingContext.closePath();
 
-    drawingContext.fillStyle = '#fdf0d5';
-    drawingContext.fill('evenodd');
+    // ──────────────────────────────────────────────
+    // Mode 1: 😍 愛心眼
+    // ──────────────────────────────────────────────
+    else if (currentMode === 1) {
+      drawFaceFill('#ffe0f0');
+      drawLines(faceContour, color(255, 100, 180), 2);
+      drawLines(pointsToConnect1, color(255, 50, 150), 2);
+      drawLines(pointsToConnect2, color(255, 50, 150), 2);
 
-    drawingContext.restore();
+      const drawHeart = (cx, cy, sz) => {
+        let s = sz * (1 + 0.15 * Math.sin(heartAnim));
+        drawingContext.save();
+        drawingContext.translate(cx, cy);
+        drawingContext.scale(s, s);
+        drawingContext.beginPath();
+        drawingContext.moveTo(0, -8);
+        drawingContext.bezierCurveTo(8, -20, 22, -10, 0, 8);
+        drawingContext.bezierCurveTo(-22, -10, -8, -20, 0, -8);
+        drawingContext.fillStyle = 'rgba(255,50,120,0.95)';
+        drawingContext.fill();
+        drawingContext.restore();
 
-    // ── 臉部輪廓藍色（螢光藍）線條 ──────────────────────────
-    drawLines(faceContour, color(0, 200, 255), 2);
+        // 周圍小愛心
+        let sr = sz * 10;
+        for (let a = 0; a < 360; a += 45) {
+          let ax = cx + sr * Math.cos(radians(a + heartAnim * 30));
+          let ay = cy + sr * Math.sin(radians(a + heartAnim * 30));
+          let ss = (2 + Math.sin(heartAnim + a) * 1) * 0.4;
+          drawingContext.save();
+          drawingContext.translate(ax, ay);
+          drawingContext.scale(ss, ss);
+          drawingContext.beginPath();
+          drawingContext.moveTo(0, -8);
+          drawingContext.bezierCurveTo(8, -20, 22, -10, 0, 8);
+          drawingContext.bezierCurveTo(-22, -10, -8, -20, 0, -8);
+          drawingContext.fillStyle = 'rgba(255,180,210,0.7)';
+          drawingContext.fill();
+          drawingContext.restore();
+        }
+      };
 
-    // ── 嘴唇 ────────────────────────────────────────────────
-    drawLines(pointsToConnect1, color(255, 0, 0), 1);
-    drawLines(pointsToConnect2, color(255, 0, 0), 1);
+      let re = toCanvas(keypoints[468] || keypoints[33]);
+      let le = toCanvas(keypoints[473] || keypoints[263]);
+      let eyeW = Math.abs(re.x - le.x);
+      drawHeart(re.x, re.y, eyeW / 10);
+      drawHeart(le.x, le.y, eyeW / 10);
 
-    // ── 右眼外圈（黑眼圈，粗細15） ──────────────────────────
-    drawLines(rightEyeOuter, color(40, 40, 40), 15);
-    // 右眼內圈
-    drawLines(rightEyeInner, color(255, 0, 0), 1);
+      let nose = toCanvas(keypoints[noseTip]);
+      fill(255, 100, 180);
+      noStroke();
+      textSize(22);
+      textAlign(CENTER, CENTER);
+      text('❤', nose.x - 15, nose.y - 8);
+      text('❤', nose.x + 15, nose.y - 8);
+    }
 
-    // ── 左眼外圈（黑眼圈，粗細15） ──────────────────────────
-    drawLines(leftEyeOuter, color(40, 40, 40), 15);
-    // 左眼內圈
-    drawLines(leftEyeInner, color(255, 0, 0), 1);
+    // ──────────────────────────────────────────────
+    // Mode 2: 🥹 感動淚
+    // ──────────────────────────────────────────────
+    else if (currentMode === 2) {
+      drawFaceFill('#eef7ff');
+      drawLines(faceContour, color(100, 160, 255), 2);
+      drawLines(pointsToConnect1, color(80, 140, 255), 1.5);
+      drawLines(pointsToConnect2, color(80, 140, 255), 1.5);
+      drawLines(rightEyeInner, color(100, 180, 255), 1.5);
+      drawLines(leftEyeInner, color(100, 180, 255), 1.5);
+
+      const drawTear = (ex, ey) => {
+        let t = (tearAnim * 40) % 160;
+        noStroke();
+        for (let i = 0; i < 3; i++) {
+          let drop = (t + i * 55) % 160;
+          let alpha = drop < 120 ? 230 : map(drop, 120, 160, 230, 0);
+          drawingContext.save();
+          drawingContext.translate(ex, ey + drop * 0.5);
+          drawingContext.beginPath();
+          drawingContext.arc(0, 0, 4, 0, Math.PI * 2);
+          drawingContext.fillStyle = `rgba(100,180,255,${alpha / 255})`;
+          drawingContext.fill();
+          drawingContext.restore();
+        }
+        fill(150, 210, 255, 120);
+        ellipse(ex, ey + 5, 16, 8);
+      };
+
+      let re = toCanvas(keypoints[33] || keypoints[133]);
+      let le = toCanvas(keypoints[263] || keypoints[362]);
+      drawTear(re.x + 2, re.y + 4);
+      drawTear(le.x - 2, le.y + 4);
+    }
+
+    // ──────────────────────────────────────────────
+    // Mode 3: 🤡 小丑
+    // ──────────────────────────────────────────────
+    else if (currentMode === 3) {
+      drawFaceFill('#ffffff');
+      drawLines(faceContour, color(0, 0, 0), 2);
+
+      let nose = toCanvas(keypoints[noseTip]);
+      let re = toCanvas(keypoints[133] || keypoints[33]);
+      let le = toCanvas(keypoints[362] || keypoints[263]);
+      let lc = toCanvas(keypoints[leftCheek]);
+      let rc = toCanvas(keypoints[rightCheek]);
+      let eyeW = Math.abs(re.x - le.x);
+
+      // 紅鼻子
+      noStroke();
+      fill(255, 40, 40);
+      ellipse(nose.x, nose.y, eyeW * 0.9, eyeW * 0.9);
+
+      // 腮紅
+      fill(255, 40, 40, 60);
+      let lcAdj = {x: lc.x + (nose.x - lc.x) * 0.25, y: lc.y};
+      let rcAdj = {x: rc.x + (nose.x - rc.x) * 0.25, y: rc.y};
+      ellipse(lcAdj.x, lcAdj.y, eyeW * 0.8, eyeW * 0.65);
+      ellipse(rcAdj.x, rcAdj.y, eyeW * 0.8, eyeW * 0.65);
+
+      // 黑眼圈改為藍色實線
+      drawLines(rightEyeOuter, color(0, 100, 255), 12);
+      drawLines(leftEyeOuter, color(0, 100, 255), 12);
+
+      // 小丑嘴巴：用指定點串接成紅色粗線
+      drawLines(pointsToConnect1, color(255, 0, 0), 15);
+    }
+
+    // ──────────────────────────────────────────────
+    // Mode 4: 無特效
+    // ──────────────────────────────────────────────
+    else if (currentMode === 4) {
+      // 無任何特效，只顯示攝像頭畫面
+    }
   }
 }
 
