@@ -27,7 +27,7 @@ function draw() {
   fill(0); // 設定文字為黑色
   textSize(32); // 設定文字大小
   textAlign(CENTER, CENTER);
-  text("教科123456789", width / 2, height * 0.15);
+  text("教科414730571", width / 2, height * 0.15);
 
   // 計算等比例縮放 (不拉長，限制在畫布 50% 內)
   let videoAspect = capture.width / capture.height;
