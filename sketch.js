@@ -12,12 +12,10 @@ function setup() {
   capture.hide(); // 隱藏預設的影片元件，只顯示在畫布上
 
   // 初始化 FaceMesh 模型
-  faceMesh = ml5.facemesh(capture, () => console.log("Model Ready!"));
+  faceMesh = ml5.faceMesh(() => console.log("Model Ready!"));
   
-  // 當偵測到臉部資料時更新 predictions 變數
-  faceMesh.on("predict", results => {
-    predictions = results;
-  });
+  // 開始持續偵測攝影機影像
+  faceMesh.detectStart(capture, results => { predictions = results; });
 }
 
 function draw() {
@@ -27,7 +25,7 @@ function draw() {
   fill(0); // 設定文字為黑色
   textSize(32); // 設定文字大小
   textAlign(CENTER, CENTER);
-  text("教科414730571", width / 2, height * 0.15);
+  text("教科123456789", width / 2, height * 0.15);
 
   // 計算等比例縮放 (不拉長，限制在畫布 50% 內)
   let videoAspect = capture.width / capture.height;
@@ -52,7 +50,7 @@ function draw() {
 
   // 如果有偵測到臉部點位
   if (predictions.length > 0) {
-    let keypoints = predictions[0].scaledMesh;
+    let keypoints = predictions[0].keypoints;
 
     stroke(255, 0, 0); // 紅色線條
     strokeWeight(15); // 線條粗細為 15
@@ -63,10 +61,10 @@ function draw() {
       let p2_idx = pointsToConnect[i + 1];
 
       // 將點位座標從攝影機解析度映射到畫布顯示的大小與位置
-      let x1 = map(keypoints[p1_idx][0], 0, capture.width, vx, vx + vW);
-      let y1 = map(keypoints[p1_idx][1], 0, capture.height, vy, vy + vH);
-      let x2 = map(keypoints[p2_idx][0], 0, capture.width, vx, vx + vW);
-      let y2 = map(keypoints[p2_idx][1], 0, capture.height, vy, vy + vH);
+      let x1 = map(keypoints[p1_idx].x, 0, capture.width, vx, vx + vW);
+      let y1 = map(keypoints[p1_idx].y, 0, capture.height, vy, vy + vH);
+      let x2 = map(keypoints[p2_idx].x, 0, capture.width, vx, vx + vW);
+      let y2 = map(keypoints[p2_idx].y, 0, capture.height, vy, vy + vH);
 
       line(x1, y1, x2, y2);
     }
