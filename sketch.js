@@ -28,11 +28,14 @@ function draw() {
   text("教科123456789", width / 2, height * 0.15);
 
   // 計算等比例縮放 (不拉長，限制在畫布 50% 內)
-  let videoAspect = capture.width / capture.height;
+  let vW = 0, vH = 0;
+  let vx = width / 2, vy = height / 2;
+
+  if (capture.width > 0 && capture.height > 0) {
+    let videoAspect = capture.width / capture.height;
   let targetW = width * 0.5;
   let targetH = height * 0.5;
   
-  let vW, vH;
   if (videoAspect > targetW / targetH) {
     vW = targetW;
     vH = vW / videoAspect;
@@ -41,12 +44,13 @@ function draw() {
     vW = vH * videoAspect;
   }
 
-  let vx = (width - vW) / 2;
-  let vy = (height - vH) / 2;
+    vx = (width - vW) / 2;
+    vy = (height - vH) / 2;
+  }
 
   // 將影像顯示在畫布正中間
   imageMode(CORNER);
-  image(capture, vx, vy, vW, vH);
+  if (vW > 0) image(capture, vx, vy, vW, vH);
 
   // 如果有偵測到臉部點位
   if (predictions.length > 0) {
