@@ -30,8 +30,10 @@ function setup() {
   capture.size(640, 480);
   capture.hide();
 
-  faceMesh = ml5.faceMesh(() => console.log("Model Ready!"));
-  faceMesh.detectStart(capture, results => { predictions = results; });
+  faceMesh = ml5.faceMesh(() => {
+    console.log("Model Ready!");
+    faceMesh.detectStart(capture, results => { predictions = results; });
+  });
 }
 
 function draw() {
